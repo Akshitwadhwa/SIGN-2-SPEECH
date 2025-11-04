@@ -232,20 +232,13 @@ const SignToText = () => {
           muted 
         />
 
-        {/* Grayscale Reference Box Overlay */}
-        {isCameraActive && (
-          <div className="absolute top-4 left-4 w-48 h-48 bg-white border-4 border-green-500 rounded-lg overflow-hidden shadow-2xl">
-            <canvas 
-              ref={canvasRef}
-              width="192"
-              height="192"
-              className="w-full h-full"
-            />
-            <div className="absolute bottom-0 left-0 right-0 bg-green-500 bg-opacity-90 text-white text-center py-1 text-xs font-semibold">
-              Place hand here
-            </div>
-          </div>
-        )}
+        {/* Hidden canvas for image processing */}
+        <canvas 
+          ref={canvasRef}
+          width="192"
+          height="192"
+          className="hidden"
+        />
 
         {/* Current Detection Overlay */}
         {isCameraActive && currentSign && (
@@ -257,7 +250,7 @@ const SignToText = () => {
         
         {/* Placeholder / Error Message */}
         {!isCameraActive && (
-            <div className={`absolute inset-0 flex flex-col items-center justify-center p-4 rounded-xl text-center bg-gray-100 ${isCameraActive ? 'hidden' : ''}`}>
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 rounded-xl text-center bg-gray-100">
                 <VideoOff className="w-12 h-12 text-gray-400 mb-4" />
                 {cameraError ? (
                     <p className="text-red-500 font-medium">{cameraError}</p>

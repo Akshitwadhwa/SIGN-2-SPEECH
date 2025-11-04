@@ -29,14 +29,9 @@ def load_model():
     try:
         print("Loading ASL sign language model...")
         
-        # Try to load the new ASL model first, fall back to old model
-        model_path = './trained_model/asl_best_model.h5'
-        metadata_path = './trained_model/asl_model_metadata.json'
-        
-        if not os.path.exists(model_path):
-            print("ASL model not found, using previous model...")
-            model_path = './trained_model/best_model.h5'
-            metadata_path = './trained_model/model_metadata.json'
+        # Use the improved model from frontend/public/models
+        model_path = '../frontend/public/models/best_model.h5'
+        metadata_path = '../frontend/public/models/model_metadata.json'
         
         # Load model
         model = keras.models.load_model(model_path)
@@ -176,7 +171,8 @@ def predict():
         
         # Debug logging
         print(f"Prediction: {predicted_sign} ({confidence:.2%})")
-        print(f"Top 3: {', '.join([f'{p['sign']}({p['confidence']:.2%})' for p in top_5_predictions[:3]])}")
+        top_3_str = ', '.join([f"{p['sign']}({p['confidence']:.2%})" for p in top_5_predictions[:3]])
+        print(f"Top 3: {top_3_str}")
         
         # Return prediction
         confidence_threshold = data.get('threshold', 0.5)
