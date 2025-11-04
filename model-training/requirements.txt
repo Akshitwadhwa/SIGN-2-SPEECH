@@ -1,0 +1,8 @@
+# Python dependencies for training the sign language model
+
+tensorflow
+opencv-python
+numpy
+scikit-learn
+matplotlib
+Pillow

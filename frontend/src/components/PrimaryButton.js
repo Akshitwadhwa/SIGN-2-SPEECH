@@ -1,5 +1,4 @@
 import React from 'react';
-import PropTypes from 'prop-types';
 
 const PrimaryButton = ({ children, onClick, icon: Icon, className = '', disabled = false }) => (
   <button
@@ -15,13 +14,5 @@ const PrimaryButton = ({ children, onClick, icon: Icon, className = '', disabled
     {children}
   </button>
 );
-
-PrimaryButton.propTypes = {
-  children: PropTypes.node,
-  onClick: PropTypes.func,
-  icon: PropTypes.oneOfType([PropTypes.func, PropTypes.object]),
-  className: PropTypes.string,
-  disabled: PropTypes.bool,
-};
 
 export default PrimaryButton;
