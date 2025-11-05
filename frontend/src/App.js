@@ -3,14 +3,14 @@ import { Type, Volume2, Mic, Smile } from 'lucide-react';
 import useBackendIntegration from './hooks/useBackendIntegration';
 import SignToText from './components/SignToText';
 import TextToSpeech from './components/TextToSpeech';
-import SpeechToText from './components/SpeechToText';
+import SpeechToSignLanguage from './components/SpeechToSignLanguage';
 import EmotionDetection from './components/EmotionDetection';
 
 // Define tab configuration for navigation and icon mapping
 const tabs = [
   { id: 'sign_to_text', name: 'Sign to Text', icon: Type, title: 'Sign Language to Text' },
   { id: 'text_to_speech', name: 'Text to Speech', icon: Volume2, title: 'Text to Speech' },
-  { id: 'speech_to_text', name: 'Speech to Text', icon: Mic, title: 'Speech to Text' },
+  { id: 'speech_to_sign', name: 'Speech to Sign', icon: Mic, title: 'Speech to Sign Language' },
   { id: 'emotion_detection', name: 'Emotion Detection', icon: Smile, title: 'Emotion Detection' },
 ];
 
@@ -29,8 +29,8 @@ const App = () => {
         return <SignToText />;
       case 'text_to_speech':
         return <TextToSpeech {...apiProps} />;
-      case 'speech_to_text':
-        return <SpeechToText {...apiProps} />;
+      case 'speech_to_sign':
+        return <SpeechToSignLanguage />;
       case 'emotion_detection':
         return <EmotionDetection {...apiProps} />;
       default:
