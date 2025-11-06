@@ -328,11 +328,6 @@ This project is open source and available under the MIT License.
 - Create React App for the foundation
 - Sign language community for inspiration
 
-## 📧 Contact
-
-For questions or support, please open an issue on GitHub.
-
----
 
 **Made with ❤️ for accessibility and inclusion**
 
