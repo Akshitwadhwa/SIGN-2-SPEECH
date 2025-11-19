@@ -12,7 +12,9 @@ const SignToText = () => {
   const [modelLoaded, setModelLoaded] = useState(false);
   const [currentSign, setCurrentSign] = useState(null);
   const [confidence, setConfidence] = useState(0);
-  
+  const [debugMode, setDebugMode] = useState(false);
+  const [debugImage, setDebugImage] = useState(null);
+
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const predictionIntervalRef = useRef(null);
@@ -48,7 +50,7 @@ const SignToText = () => {
       setIsModelLoading(false);
     }
   };
-  
+
   // Update grayscale preview box
   const updateGrayscalePreview = () => {
     if (!videoRef.current || !canvasRef.current || !isCameraActive) return;
@@ -84,7 +86,7 @@ const SignToText = () => {
     setDetectedText('');
     lastDetectedSignRef.current = null;
     signStabilityCounterRef.current = 0;
-    
+
     // Run predictions every 500ms
     predictionIntervalRef.current = setInterval(async () => {
       if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) {
@@ -96,18 +98,19 @@ const SignToText = () => {
         updateGrayscalePreview();
 
         // Make prediction on current frame (lowered threshold to 0.4 for better detection)
-        const prediction = await signLanguageModel.predict(videoRef.current, 0.4);
-        
+        const prediction = await signLanguageModel.predict(videoRef.current, 0.4, debugMode);
+
         if (prediction) {
-          const { sign, confidence: conf } = prediction;
-          
+          const { sign, confidence: conf, debugImage: dbgImg } = prediction;
+
+          setDebugImage(dbgImg);
           setCurrentSign(sign);
           setConfidence(conf);
-          
+
           // Sign stabilization: only add to text if same sign detected multiple times
           if (sign === lastDetectedSignRef.current) {
             signStabilityCounterRef.current += 1;
-            
+
             // Add to text after 3 consecutive detections (1.5 seconds)
             if (signStabilityCounterRef.current === 3) {
               setDetectedText(prev => {
@@ -136,7 +139,7 @@ const SignToText = () => {
       }
     }, 500);
   };
-  
+
   const handleStartCamera = async () => {
     if (!modelLoaded) {
       setCameraError('Please wait for the model to load before starting the camera.');
@@ -149,21 +152,21 @@ const SignToText = () => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Your browser does not support camera access.");
       }
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
           width: { ideal: 640 },
           height: { ideal: 480 },
           facingMode: 'user'
-        } 
+        }
       });
       streamRef.current = stream;
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
         setIsCameraActive(true);
-        
+
         // Start real-time detection
         startRealTimeDetection();
       }
@@ -173,22 +176,22 @@ const SignToText = () => {
       setIsCameraActive(false);
     }
   };
-  
+
   const handleStopCamera = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
     if (predictionIntervalRef.current) {
-        clearInterval(predictionIntervalRef.current);
-        predictionIntervalRef.current = null;
+      clearInterval(predictionIntervalRef.current);
+      predictionIntervalRef.current = null;
     }
     setIsCameraActive(false);
     setCurrentSign(null);
     setConfidence(0);
     setDetectedText('Camera stopped. Ready to start new session.');
   };
-  
+
   // Cleanup effect
   useEffect(() => {
     return () => {
@@ -221,19 +224,19 @@ const SignToText = () => {
 
       {/* Camera Feed Area */}
       <div className="bg-gray-800 p-2 h-96 rounded-xl shadow-inner mb-4 flex flex-col items-center justify-center relative overflow-hidden">
-        
+
         {/* Video Element (mirrored to feel natural) */}
-        <video 
-          ref={videoRef} 
+        <video
+          ref={videoRef}
           className={`w-full h-full object-cover rounded-lg transform scale-x-[-1] transition-opacity duration-500 
             ${isCameraActive ? 'opacity-100' : 'opacity-0 absolute'}`}
-          autoPlay 
-          playsInline 
-          muted 
+          autoPlay
+          playsInline
+          muted
         />
 
         {/* Hidden canvas for image processing */}
-        <canvas 
+        <canvas
           ref={canvasRef}
           width="192"
           height="192"
@@ -247,20 +250,51 @@ const SignToText = () => {
             <p className="text-xs text-gray-300">Confidence: {(confidence * 100).toFixed(1)}%</p>
           </div>
         )}
-        
+
         {/* Placeholder / Error Message */}
         {!isCameraActive && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 rounded-xl text-center bg-gray-100">
-                <VideoOff className="w-12 h-12 text-gray-400 mb-4" />
-                {cameraError ? (
-                    <p className="text-red-500 font-medium">{cameraError}</p>
-                ) : (
-                    <p className="text-gray-600">Click 'Start Camera' to enable live sign language detection.</p>
-                )}
-            </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 rounded-xl text-center bg-gray-100">
+            <VideoOff className="w-12 h-12 text-gray-400 mb-4" />
+            {cameraError ? (
+              <p className="text-red-500 font-medium">{cameraError}</p>
+            ) : (
+              <p className="text-gray-600">Click 'Start Camera' to enable live sign language detection.</p>
+            )}
+          </div>
         )}
-        
+
       </div>
+
+      {/* Debug View */}
+      <div className="flex items-center justify-center mb-4">
+        <label className="flex items-center cursor-pointer">
+          <div className="relative">
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={debugMode}
+              onChange={() => setDebugMode(!debugMode)}
+            />
+            <div className={`block w-14 h-8 rounded-full ${debugMode ? 'bg-blue-600' : 'bg-gray-400'}`}></div>
+            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition ${debugMode ? 'transform translate-x-6' : ''}`}></div>
+          </div>
+          <div className="ml-3 text-gray-700 font-medium">
+            Debug Mode (Show what AI sees)
+          </div>
+        </label>
+      </div>
+
+      {debugMode && debugImage && (
+        <div className="mb-6 p-4 bg-gray-100 rounded-xl border border-gray-300 flex flex-col items-center">
+          <h3 className="text-sm font-semibold text-gray-600 mb-2">AI Input View (Preprocessed)</h3>
+          <div className="relative w-32 h-32 bg-black rounded-lg overflow-hidden border-2 border-blue-500">
+            <img src={debugImage} alt="Debug View" className="w-full h-full object-cover" />
+          </div>
+          <p className="text-xs text-gray-500 mt-2 text-center max-w-xs">
+            This is the exact image sent to the model. Ensure the hand is clearly visible and separated from the background.
+          </p>
+        </div>
+      )}
 
       {/* Status Info */}
       {isCameraActive && (
@@ -270,29 +304,29 @@ const SignToText = () => {
           </p>
         </div>
       )}
-      
+
       <div className="flex justify-center space-x-4 mb-8">
-          {!isCameraActive ? (
-              <PrimaryButton 
-                onClick={handleStartCamera} 
-                icon={Type} 
-                className="w-48"
-                disabled={!modelLoaded || isModelLoading}
-              >
-                Start Camera
-              </PrimaryButton>
-          ) : (
-              <PrimaryButton onClick={handleStopCamera} icon={StopCircle} className="w-48 bg-red-600 hover:bg-red-700">
-                Stop Camera
-              </PrimaryButton>
-          )}
+        {!isCameraActive ? (
+          <PrimaryButton
+            onClick={handleStartCamera}
+            icon={Type}
+            className="w-48"
+            disabled={!modelLoaded || isModelLoading}
+          >
+            Start Camera
+          </PrimaryButton>
+        ) : (
+          <PrimaryButton onClick={handleStopCamera} icon={StopCircle} className="w-48 bg-red-600 hover:bg-red-700">
+            Stop Camera
+          </PrimaryButton>
+        )}
       </div>
 
       {/* Detected Text Area */}
       <h2 className="text-lg font-semibold text-gray-700 mb-3">Live Transcription:</h2>
       <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-inner">
         <p className="w-full h-32 bg-transparent resize-none overflow-y-auto text-gray-800 p-1">
-            {detectedText || 'Detected signs will appear here...'}
+          {detectedText || 'Detected signs will appear here...'}
         </p>
       </div>
 

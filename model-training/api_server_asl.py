@@ -176,22 +176,30 @@ def predict():
         
         # Return prediction
         confidence_threshold = data.get('threshold', 0.5)
+        debug_mode = data.get('debug', False)
         
-        if confidence >= confidence_threshold:
-            return jsonify({
-                'success': True,
-                'sign': predicted_sign,
-                'confidence': confidence,
-                'top_predictions': top_5_predictions
-            })
-        else:
-            return jsonify({
-                'success': True,
-                'sign': None,
-                'confidence': confidence,
-                'message': f'Confidence ({confidence:.2f}) below threshold ({confidence_threshold})',
-                'top_predictions': top_5_predictions
-            })
+        response_data = {
+            'success': True,
+            'sign': predicted_sign if confidence >= confidence_threshold else None,
+            'confidence': confidence,
+            'top_predictions': top_5_predictions
+        }
+        
+        if confidence < confidence_threshold:
+            response_data['message'] = f'Confidence ({confidence:.2f}) below threshold ({confidence_threshold})'
+
+        # If debug mode is on, return the preprocessed image as base64
+        if debug_mode:
+            # processed_image is (1, 64, 64, 1) float32 [0,1]
+            # Convert back to uint8 [0,255] for display
+            debug_img = (processed_image[0, :, :, 0] * 255).astype(np.uint8)
+            
+            # Encode to jpg base64
+            _, buffer = cv2.imencode('.jpg', debug_img)
+            debug_base64 = base64.b64encode(buffer).decode('utf-8')
+            response_data['debug_image'] = f"data:image/jpeg;base64,{debug_base64}"
+            
+        return jsonify(response_data)
             
     except Exception as e:
         print(f"Prediction error: {e}")

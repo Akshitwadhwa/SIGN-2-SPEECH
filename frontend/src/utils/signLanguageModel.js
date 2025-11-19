@@ -16,23 +16,23 @@ class SignLanguageModel {
   async loadModel() {
     try {
       console.log('Connecting to sign language API...');
-      
+
       // Check if API is running
       const healthResponse = await fetch(`${this.apiUrl}/health`);
       const healthData = await healthResponse.json();
-      
+
       if (!healthData.model_loaded) {
         throw new Error('Model not loaded on server');
       }
-      
+
       // Load metadata (class names, etc.)
       const classesResponse = await fetch(`${this.apiUrl}/classes`);
       this.metadata = await classesResponse.json();
       console.log('Metadata loaded:', this.metadata);
-      
+
       this.isLoaded = true;
       console.log('API ready for predictions');
-      
+
       return {
         success: true,
         classNames: this.metadata.classes,
@@ -63,7 +63,7 @@ class SignLanguageModel {
   /**
    * Make prediction on current video frame
    */
-  async predict(videoElement, confidenceThreshold = 0.7) {
+  async predict(videoElement, confidenceThreshold = 0.7, debug = false) {
     if (!this.isLoaded) {
       console.warn('API not connected yet');
       return null;
@@ -72,7 +72,7 @@ class SignLanguageModel {
     try {
       // Capture frame as base64
       const imageData = this.captureFrame(videoElement);
-      
+
       // Send to API
       const response = await fetch(`${this.apiUrl}/predict`, {
         method: 'POST',
@@ -81,20 +81,22 @@ class SignLanguageModel {
         },
         body: JSON.stringify({
           image: imageData,
-          threshold: confidenceThreshold
+          threshold: confidenceThreshold,
+          debug: debug
         })
       });
-      
+
       const result = await response.json();
-      
-      if (result.success && result.sign) {
+
+      if (result.success) {
         return {
           sign: result.sign,
           confidence: result.confidence,
-          allPredictions: result.top_predictions
+          allPredictions: result.top_predictions,
+          debugImage: result.debug_image
         };
       }
-      
+
       return null;
     } catch (error) {
       console.error('Prediction error:', error);
