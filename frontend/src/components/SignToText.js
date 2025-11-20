@@ -137,7 +137,7 @@ const SignToSpeech = () => {
           const { sign, confidence: conf, debugImage: dbgImg } = prediction;
 
           setDebugImage(dbgImg);
-          
+
           // Only process if sign is not null
           if (sign && sign !== null) {
             setCurrentSign(sign);
@@ -173,7 +173,7 @@ const SignToSpeech = () => {
                     });
                     return newBuffer;
                   });
-                  
+
                   // Optional: speak individual letters if enabled
                   if (autoSpeak) {
                     const utterance = new SpeechSynthesisUtterance(sign);
@@ -255,7 +255,7 @@ const SignToSpeech = () => {
       clearInterval(predictionIntervalRef.current);
       predictionIntervalRef.current = null;
     }
-    
+
     // Complete any remaining word in buffer
     if (wordBuffer.length > 0) {
       const finalText = [...completedWords, wordBuffer].join(' ');
@@ -264,7 +264,7 @@ const SignToSpeech = () => {
         speakWord(wordBuffer);
       }
     }
-    
+
     setIsCameraActive(false);
     setCurrentSign(null);
     setConfidence(0);
@@ -286,20 +286,20 @@ const SignToSpeech = () => {
   };
 
   return (
-    <div className="p-8">
-      <TitleIconContainer icon={Volume2} colorClass="text-blue-600" title="Sign Language to Speech Conversion" />
+    <div className="max-w-6xl mx-auto p-6 space-y-8">
+      <TitleIconContainer icon={Volume2} colorClass="text-primary" title="Sign Language to Speech" />
 
       {/* Model Loading Status */}
       {isModelLoading && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center">
-          <Loader className="w-5 h-5 text-blue-600 mr-3 animate-spin" />
-          <span className="text-blue-800 font-medium">Loading AI model...</span>
+        <div className="card p-4 flex items-center bg-blue-50 border-blue-100">
+          <Loader className="w-5 h-5 text-primary mr-3 animate-spin" />
+          <span className="text-primary font-medium">Loading AI model...</span>
         </div>
       )}
 
       {/* Model Error */}
       {!isModelLoading && !modelLoaded && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center">
+        <div className="card p-4 bg-red-50 border-red-100 flex items-center">
           <AlertCircle className="w-5 h-5 text-red-600 mr-3" />
           <div className="text-red-800">
             <p className="font-medium">Model not loaded</p>
@@ -308,186 +308,194 @@ const SignToSpeech = () => {
         </div>
       )}
 
-      {/* Camera Feed Area */}
-      <div className="bg-gray-800 p-2 h-96 rounded-xl shadow-inner mb-4 flex flex-col items-center justify-center relative overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Left Column: Camera Feed */}
+        <div className="space-y-6">
+          <div className="card overflow-hidden bg-gray-900 relative aspect-video flex items-center justify-center shadow-xl">
+            {/* Video Element */}
+            <video
+              ref={videoRef}
+              className={`w-full h-full object-cover transform scale-x-[-1] transition-opacity duration-500 
+                ${isCameraActive ? 'opacity-100' : 'opacity-0 absolute'}`}
+              autoPlay
+              playsInline
+              muted
+            />
 
-        {/* Video Element (mirrored to feel natural) */}
-        <video
-          ref={videoRef}
-          className={`w-full h-full object-cover rounded-lg transform scale-x-[-1] transition-opacity duration-500 
-            ${isCameraActive ? 'opacity-100' : 'opacity-0 absolute'}`}
-          autoPlay
-          playsInline
-          muted
-        />
+            {/* Hidden canvas */}
+            <canvas ref={canvasRef} width="192" height="192" className="hidden" />
 
-        {/* Hidden canvas for image processing */}
-        <canvas
-          ref={canvasRef}
-          width="192"
-          height="192"
-          className="hidden"
-        />
+            {/* Current Detection Overlay */}
+            {isCameraActive && currentSign && (
+              <div className="absolute top-4 right-4 bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-xl border border-white/10">
+                <p className="text-3xl font-bold">{currentSign}</p>
+                <p className="text-xs text-gray-300">{(confidence * 100).toFixed(0)}% sure</p>
+              </div>
+            )}
 
-        {/* Current Detection Overlay */}
-        {isCameraActive && currentSign && (
-          <div className="absolute top-4 right-4 bg-black bg-opacity-70 text-white px-4 py-2 rounded-lg">
-            <p className="text-2xl font-bold">{currentSign}</p>
-            <p className="text-xs text-gray-300">Confidence: {(confidence * 100).toFixed(1)}%</p>
-          </div>
-        )}
-
-        {/* Placeholder / Error Message */}
-        {!isCameraActive && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 rounded-xl text-center bg-gray-100">
-            <VideoOff className="w-12 h-12 text-gray-400 mb-4" />
-            {cameraError ? (
-              <p className="text-red-500 font-medium">{cameraError}</p>
-            ) : (
-              <p className="text-gray-600">Click 'Start Camera' to enable live sign language detection.</p>
+            {/* Placeholder / Error */}
+            {!isCameraActive && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-gray-100/10 backdrop-blur-sm text-white">
+                <VideoOff className="w-16 h-16 mb-4 opacity-50" />
+                {cameraError ? (
+                  <p className="text-red-400 font-medium">{cameraError}</p>
+                ) : (
+                  <p className="text-gray-300 text-lg">Start the camera to begin sign detection</p>
+                )}
+              </div>
             )}
           </div>
-        )}
 
-      </div>
+          {/* Controls */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-6">
+              {/* Debug Toggle */}
+              <label className="flex items-center cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={debugMode}
+                    onChange={() => setDebugMode(!debugMode)}
+                  />
+                  <div className={`block w-12 h-7 rounded-full transition-colors ${debugMode ? 'bg-primary' : 'bg-gray-300'}`}></div>
+                  <div className={`absolute left-1 top-1 bg-white w-5 h-5 rounded-full transition-transform ${debugMode ? 'translate-x-5' : ''}`}></div>
+                </div>
+                <span className="ml-3 text-sm font-medium text-gray-600 group-hover:text-primary transition-colors">Debug View</span>
+              </label>
 
-      {/* Controls */}
-      <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
+              {/* Auto Speak Toggle */}
+              <label className="flex items-center cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={autoSpeak}
+                    onChange={() => setAutoSpeak(!autoSpeak)}
+                  />
+                  <div className={`block w-12 h-7 rounded-full transition-colors ${autoSpeak ? 'bg-secondary' : 'bg-gray-300'}`}></div>
+                  <div className={`absolute left-1 top-1 bg-white w-5 h-5 rounded-full transition-transform ${autoSpeak ? 'translate-x-5' : ''}`}></div>
+                </div>
+                <span className="ml-3 text-sm font-medium text-gray-600 group-hover:text-secondary transition-colors">Auto Speak</span>
+              </label>
+            </div>
 
-        {/* Debug Toggle */}
-        <label className="flex items-center cursor-pointer">
-          <div className="relative">
-            <input
-              type="checkbox"
-              className="sr-only"
-              checked={debugMode}
-              onChange={() => setDebugMode(!debugMode)}
-            />
-            <div className={`block w-14 h-8 rounded-full ${debugMode ? 'bg-blue-600' : 'bg-gray-400'}`}></div>
-            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition ${debugMode ? 'transform translate-x-6' : ''}`}></div>
+            {/* Camera Buttons */}
+            {!isCameraActive ? (
+              <PrimaryButton
+                onClick={handleStartCamera}
+                icon={Type}
+                disabled={!modelLoaded || isModelLoading}
+                className="w-full sm:w-auto"
+              >
+                Start Camera
+              </PrimaryButton>
+            ) : (
+              <PrimaryButton
+                onClick={handleStopCamera}
+                icon={StopCircle}
+                className="w-full sm:w-auto !bg-red-600 hover:!bg-red-700"
+              >
+                Stop Camera
+              </PrimaryButton>
+            )}
           </div>
-          <div className="ml-3 text-gray-700 font-medium">
-            Debug View
-          </div>
-        </label>
+        </div>
 
-        {/* Auto Speak Toggle */}
-        <label className="flex items-center cursor-pointer">
-          <div className="relative">
-            <input
-              type="checkbox"
-              className="sr-only"
-              checked={autoSpeak}
-              onChange={() => setAutoSpeak(!autoSpeak)}
-            />
-            <div className={`block w-14 h-8 rounded-full ${autoSpeak ? 'bg-green-600' : 'bg-gray-400'}`}></div>
-            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition ${autoSpeak ? 'transform translate-x-6' : ''}`}></div>
-          </div>
-          <div className="ml-3 text-gray-700 font-medium">
-            Auto Speak
-          </div>
-        </label>
+        {/* Right Column: Results & Debug */}
+        <div className="space-y-6">
+          {/* Detected Text Area */}
+          <div className="card p-6 h-full flex flex-col min-h-[400px]">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <span className="w-2 h-8 bg-primary rounded-full"></span>
+                Live Transcription
+              </h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleClearText}
+                  className="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-red-500 transition-colors"
+                  title="Clear Text"
+                  disabled={!detectedText || detectedText === 'Sign language interpretation will appear here...'}
+                >
+                  <StopCircle className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleSpeakFullText}
+                  className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${isSpeaking ? 'text-primary animate-pulse' : 'text-gray-500 hover:text-primary'}`}
+                  title="Speak Full Text"
+                  disabled={!detectedText || detectedText === 'Sign language interpretation will appear here...'}
+                >
+                  <Volume2 className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
 
-        {/* Camera Buttons */}
-        <div className="flex space-x-4">
-          {!isCameraActive ? (
-            <PrimaryButton
-              onClick={handleStartCamera}
-              icon={Type}
-              className="w-40"
-              disabled={!modelLoaded || isModelLoading}
-            >
-              Start Camera
-            </PrimaryButton>
-          ) : (
-            <PrimaryButton onClick={handleStopCamera} icon={StopCircle} className="w-40 bg-red-600 hover:bg-red-700">
-              Stop Camera
-            </PrimaryButton>
+            <div className="flex-1 bg-gray-50 rounded-xl p-4 border border-gray-100 overflow-y-auto mb-4 shadow-inner">
+              {detectedText === 'Sign language interpretation will appear here...' ? (
+                <p className="text-gray-400 italic text-center mt-10">
+                  Waiting for sign language input...
+                </p>
+              ) : (
+                <p className="text-lg text-gray-800 leading-relaxed font-medium">
+                  {detectedText}
+                </p>
+              )}
+            </div>
+
+            {/* Current Word Buffer */}
+            <div className="space-y-2">
+              {wordBuffer && (
+                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100 animate-in fade-in slide-in-from-bottom-2">
+                  <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Typing</span>
+                  <span className="text-xl font-mono text-blue-900">{wordBuffer}</span>
+                </div>
+              )}
+
+              {completedWords.length > 0 && (
+                <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
+                  <span className="text-xs font-bold text-green-600 uppercase tracking-wider">Latest</span>
+                  <span className="text-sm font-mono text-green-800 truncate">
+                    {completedWords.slice(-3).join(' ')}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Debug View Panel */}
+          {debugMode && debugImage && (
+            <div className="card p-4 flex flex-col items-center animate-in fade-in slide-in-from-top-4">
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Model Input (128x128)</h3>
+              <div className="relative w-32 h-32 bg-black rounded-lg overflow-hidden border-2 border-primary shadow-md">
+                <img src={debugImage} alt="Debug View" className="w-full h-full object-cover" />
+              </div>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Debug View Panel */}
-      {debugMode && debugImage && (
-        <div className="mb-6 p-4 bg-gray-100 rounded-xl border border-gray-300 flex flex-col items-center">
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">AI Input View (128x128)</h3>
-          <div className="relative w-32 h-32 bg-black rounded-lg overflow-hidden border-2 border-blue-500">
-            <img src={debugImage} alt="Debug View" className="w-full h-full object-cover" />
-          </div>
-          <p className="text-xs text-gray-500 mt-2 text-center max-w-xs">
-            This is the exact image sent to the model. Ensure the hand is clearly visible and centered.
-          </p>
-        </div>
-      )}
-
-      {/* Detected Text Area */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-inner">
-        <div className="flex justify-between items-center mb-2">
-          <h2 className="text-lg font-semibold text-gray-700">Live Transcription:</h2>
-          <div className="flex space-x-2">
-            <button
-              onClick={handleClearText}
-              className="p-2 rounded-full hover:bg-gray-100 transition text-gray-600"
-              title="Clear Text"
-              disabled={!detectedText || detectedText === 'Sign language interpretation will appear here...'}
-            >
-              <StopCircle className="w-5 h-5" />
-            </button>
-            <button
-              onClick={handleSpeakFullText}
-              className={`p-2 rounded-full hover:bg-gray-100 transition ${isSpeaking ? 'text-green-600' : 'text-gray-600'}`}
-              title="Speak Full Text"
-              disabled={!detectedText || detectedText === 'Sign language interpretation will appear here...'}
-            >
-              {isSpeaking ? <Volume2 className="w-6 h-6 animate-pulse" /> : <Volume2 className="w-6 h-6" />}
-            </button>
-          </div>
-        </div>
-        
-        {/* Current word being typed */}
-        {wordBuffer && (
-          <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-            <span className="text-xs text-blue-600 font-semibold">Current Word: </span>
-            <span className="text-blue-800 font-mono text-lg">{wordBuffer}</span>
-          </div>
-        )}
-        
-        {/* Completed words */}
-        {completedWords.length > 0 && (
-          <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded-lg">
-            <span className="text-xs text-green-600 font-semibold">Completed: </span>
-            <span className="text-green-800 font-mono">{completedWords.join(' ')}</span>
-          </div>
-        )}
-        
-        <div className="w-full min-h-32 bg-gray-50 rounded-lg p-3 overflow-y-auto text-gray-800 text-lg font-mono">
-          {detectedText || 'Detected signs will appear here...'}
-        </div>
-      </div>
-
-      {/* Instructions */}
-      <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
-        <h3 className="font-semibold text-gray-700 mb-3 flex items-center">
-          <AlertCircle className="w-5 h-5 mr-2 text-blue-600" />
-          Tips for Best Results:
+      {/* Tips Section */}
+      <div className="card p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
+        <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-primary" />
+          Tips for Best Results
         </h3>
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <h4 className="font-medium text-gray-700 mb-2 text-sm">Camera Setup:</h4>
-            <ul className="text-sm text-gray-600 space-y-1">
-              <li>• Ensure good lighting on your hands</li>
-              <li>• Keep your hand centered in the frame</li>
-              <li>• Hold each sign steady for 1.5 seconds</li>
-              <li>• Avoid rapid hand movements</li>
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <h4 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Camera Setup</h4>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary"></div>Ensure good lighting on your hands</li>
+              <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary"></div>Keep your hand centered in the frame</li>
+              <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary"></div>Hold each sign steady for 1.5 seconds</li>
             </ul>
           </div>
-          <div>
-            <h4 className="font-medium text-gray-700 mb-2 text-sm">Speech Features:</h4>
-            <ul className="text-sm text-gray-600 space-y-1">
-              <li>• Enable "Auto Speak" to hear letters as detected</li>
-              <li>• Use sign '0' or pause to complete a word</li>
-              <li>• Completed words will be spoken automatically</li>
-              <li>• Click speaker icon to replay full text</li>
+          <div className="space-y-2">
+            <h4 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Interactions</h4>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-secondary"></div>Enable "Auto Speak" to hear letters</li>
+              <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-secondary"></div>Use sign '0' or pause to complete a word</li>
+              <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-secondary"></div>Click speaker icon to replay full text</li>
             </ul>
           </div>
         </div>
