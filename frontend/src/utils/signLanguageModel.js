@@ -63,7 +63,7 @@ class SignLanguageModel {
   /**
    * Make prediction on current video frame
    */
-  async predict(videoElement, confidenceThreshold = 0.7, debug = false) {
+  async predict(videoElement, confidenceThreshold = 0.7, debug = false, preprocessingMode = 'robust') {
     if (!this.isLoaded) {
       console.warn('API not connected yet');
       return null;
@@ -82,7 +82,8 @@ class SignLanguageModel {
         body: JSON.stringify({
           image: imageData,
           threshold: confidenceThreshold,
-          debug: debug
+          debug: debug,
+          preprocessing_mode: preprocessingMode
         })
       });
 

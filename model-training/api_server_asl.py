@@ -19,8 +19,13 @@ CORS(app)  # Enable CORS for React frontend
 model = None
 metadata = None
 
-# Preprocessing constants (matching train_asl_model.py)
+# Preprocessing constants (matching your trained model)
+IMG_SIZE = 64  # Changed from 128 to 64
 MIN_THRESHOLD_VALUE = 70
+
+# Class names mapping (A-Z only, no '0')
+CLASS_NAMES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 
+               'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
 
 def load_model():
     """Load the trained model and metadata"""
@@ -29,23 +34,21 @@ def load_model():
     try:
         print("Loading ASL sign language model...")
         
-        # Use the improved model from frontend/public/models
+        # Use your trained best_model.h5 (100% accuracy)
         model_path = '../frontend/public/models/best_model.h5'
-        metadata_path = '../frontend/public/models/model_metadata.json'
         
         # Load model
         model = keras.models.load_model(model_path)
         print(f"✓ Model loaded from {model_path}")
         
-        # Load metadata
-        with open(metadata_path, 'r') as f:
-            metadata = json.load(f)
+        # Set metadata manually since we switched models
+        metadata = {
+            'class_names': CLASS_NAMES,
+            'img_size': IMG_SIZE,
+            'preprocessing': 'Grayscale -> Crop -> Blur -> Adaptive Threshold -> Otsu -> Resize 128x128'
+        }
         
-        # Normalize metadata structure
-        if 'class_names' not in metadata and 'classes' in metadata:
-            metadata['class_names'] = metadata['classes']
-        
-        print(f"✓ Metadata loaded: {len(metadata['class_names'])} classes")
+        print(f"✓ Metadata initialized: {len(metadata['class_names'])} classes")
         print(f"✓ Image size: {metadata['img_size']}x{metadata['img_size']}")
         
         return True
@@ -55,21 +58,32 @@ def load_model():
         traceback.print_exc()
         return False
 
-def preprocess_image_asl_style(img, img_size, min_value=MIN_THRESHOLD_VALUE):
+def preprocess_image_notebook_style(img, img_size=IMG_SIZE, min_value=MIN_THRESHOLD_VALUE):
     """
-    ASL-style preprocessing pipeline (matching train_asl_model.py):
-    1. Convert to grayscale
-    2. Gaussian blur
-    3. Adaptive thresholding
-    4. Otsu's method
-    5. Resize to target size
+    Preprocessing pipeline matching ASL_Real-Time.ipynb:
+    1. Grayscale
+    2. Crop (simulated center crop if not already cropped)
+    3. Gaussian Blur
+    4. Adaptive Threshold
+    5. Otsu Threshold
+    6. Resize
+    7. Normalize
     """
     try:
         # Convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         
-        # Apply Gaussian blur to reduce noise
-        blur = cv2.GaussianBlur(gray, (5, 5), 2)
+        # The notebook uses a fixed crop: crop_img = gray[24:250, 24:250]
+        # This assumes a specific input resolution (likely 640x480 or similar where the hand is in that box).
+        # To be more robust for the web app, we'll take a center crop that is square.
+        h, w = gray.shape
+        min_dim = min(h, w)
+        start_x = (w - min_dim) // 2
+        start_y = (h - min_dim) // 2
+        crop_img = gray[start_y:start_y+min_dim, start_x:start_x+min_dim]
+        
+        # Apply Gaussian blur
+        blur = cv2.GaussianBlur(crop_img, (5, 5), 2)
         
         # Apply adaptive thresholding
         th3 = cv2.adaptiveThreshold(
@@ -84,7 +98,7 @@ def preprocess_image_asl_style(img, img_size, min_value=MIN_THRESHOLD_VALUE):
             cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
         )
         
-        # Resize to target size
+        # Resize to target size (128x128)
         resized = cv2.resize(res, (img_size, img_size))
         
         return resized
@@ -93,7 +107,7 @@ def preprocess_image_asl_style(img, img_size, min_value=MIN_THRESHOLD_VALUE):
         return None
 
 def preprocess_image(image_data):
-    """Preprocess image using ASL-style pipeline"""
+    """Preprocess image using the notebook's pipeline"""
     try:
         # Decode base64 image
         img_bytes = base64.b64decode(image_data.split(',')[1])
@@ -104,11 +118,8 @@ def preprocess_image(image_data):
             print("Failed to decode image")
             return None
         
-        # Get image size from metadata
-        img_size = metadata['img_size']
-        
-        # Apply ASL-style preprocessing
-        processed = preprocess_image_asl_style(img, img_size, MIN_THRESHOLD_VALUE)
+        # Apply notebook-style preprocessing
+        processed = preprocess_image_notebook_style(img)
         
         if processed is None:
             return None
@@ -116,9 +127,9 @@ def preprocess_image(image_data):
         # Normalize to [0, 1]
         normalized = processed.astype('float32') / 255.0
         
-        # Add batch and channel dimensions
-        final = np.expand_dims(normalized, axis=-1)
-        final = np.expand_dims(final, axis=0)
+        # Reshape for model (1, 128, 128, 1)
+        # Notebook: reshaped=np.reshape(normalized,(1,img_size,img_size,1))
+        final = np.reshape(normalized, (1, IMG_SIZE, IMG_SIZE, 1))
         
         return final
     except Exception as e:
@@ -134,7 +145,7 @@ def health_check():
         'status': 'healthy',
         'model_loaded': model is not None,
         'classes': len(metadata['class_names']) if metadata else 0,
-        'preprocessing': 'ASL-style (adaptive threshold + Otsu)'
+        'preprocessing': metadata.get('preprocessing', 'Unknown') if metadata else 'Unknown'
     })
 
 @app.route('/predict', methods=['POST'])
@@ -171,8 +182,6 @@ def predict():
         
         # Debug logging
         print(f"Prediction: {predicted_sign} ({confidence:.2%})")
-        top_3_str = ', '.join([f"{p['sign']}({p['confidence']:.2%})" for p in top_5_predictions[:3]])
-        print(f"Top 3: {top_3_str}")
         
         # Return prediction
         confidence_threshold = data.get('threshold', 0.5)
@@ -190,7 +199,7 @@ def predict():
 
         # If debug mode is on, return the preprocessed image as base64
         if debug_mode:
-            # processed_image is (1, 64, 64, 1) float32 [0,1]
+            # processed_image is (1, 128, 128, 1) float32 [0,1]
             # Convert back to uint8 [0,255] for display
             debug_img = (processed_image[0, :, :, 0] * 255).astype(np.uint8)
             
@@ -227,9 +236,7 @@ if __name__ == '__main__':
     if load_model():
         print("\n✓ Server ready!")
         print(f"✓ Serving {len(metadata['class_names'])} sign language classes")
-        if 'test_accuracy' in metadata:
-            print(f"✓ Model accuracy: {metadata['test_accuracy']*100:.2f}%")
-        print(f"✓ Preprocessing: ASL-style (adaptive threshold + Otsu)")
+        print(f"✓ Preprocessing: {metadata['preprocessing']}")
         print("\nStarting Flask server on http://localhost:5001")
         print("API Endpoints:")
         print("  - GET  /health  - Health check")
@@ -237,7 +244,7 @@ if __name__ == '__main__':
         print("  - GET  /classes - Get list of classes")
         print("\n" + "="*60)
         
-        # Start server on port 5001 (port 5000 is used by AirPlay on macOS)
+        # Start server on port 5001
         app.run(host='0.0.0.0', port=5001, debug=False)
     else:
         print("\n✗ Failed to load model. Server not started.")

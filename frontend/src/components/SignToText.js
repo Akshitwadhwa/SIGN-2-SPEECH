@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Type, StopCircle, VideoOff, AlertCircle, Loader } from 'lucide-react';
+import { Type, StopCircle, VideoOff, AlertCircle, Loader, Volume2, VolumeX } from 'lucide-react';
 import PrimaryButton from './PrimaryButton';
 import TitleIconContainer from './TitleIconContainer';
 import signLanguageModel from '../utils/signLanguageModel';
 
-const SignToText = () => {
+const SignToSpeech = () => {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [detectedText, setDetectedText] = useState('Sign language interpretation will appear here...');
   const [cameraError, setCameraError] = useState(null);
@@ -14,6 +14,10 @@ const SignToText = () => {
   const [confidence, setConfidence] = useState(0);
   const [debugMode, setDebugMode] = useState(false);
   const [debugImage, setDebugImage] = useState(null);
+  const [autoSpeak, setAutoSpeak] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [wordBuffer, setWordBuffer] = useState('');
+  const [completedWords, setCompletedWords] = useState([]);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -30,6 +34,8 @@ const SignToText = () => {
       if (signLanguageModel.isModelLoaded()) {
         signLanguageModel.dispose();
       }
+      handleStopCamera();
+      window.speechSynthesis.cancel(); // Stop any ongoing speech
     };
   }, []);
 
@@ -49,6 +55,31 @@ const SignToText = () => {
     } finally {
       setIsModelLoading(false);
     }
+  };
+
+  const speakText = (text) => {
+    if (!text || text === 'Sign language interpretation will appear here...') return;
+
+    window.speechSynthesis.cancel(); // Stop previous
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9; // Slightly slower for clarity
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Speak completed words automatically
+  const speakWord = (word) => {
+    if (!word || !autoSpeak) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(word);
+    utterance.rate = 0.8; // Slower for individual words
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    window.speechSynthesis.speak(utterance);
   };
 
   // Update grayscale preview box
@@ -84,6 +115,8 @@ const SignToText = () => {
     if (!modelLoaded || !videoRef.current) return;
 
     setDetectedText('');
+    setWordBuffer('');
+    setCompletedWords([]);
     lastDetectedSignRef.current = null;
     signStabilityCounterRef.current = 0;
 
@@ -97,42 +130,78 @@ const SignToText = () => {
         // Update the grayscale preview box
         updateGrayscalePreview();
 
-        // Make prediction on current frame (lowered threshold to 0.4 for better detection)
-        const prediction = await signLanguageModel.predict(videoRef.current, 0.4, debugMode);
+        // Make prediction on current frame
+        const prediction = await signLanguageModel.predict(videoRef.current, 0.6, debugMode);
 
         if (prediction) {
           const { sign, confidence: conf, debugImage: dbgImg } = prediction;
 
           setDebugImage(dbgImg);
-          setCurrentSign(sign);
-          setConfidence(conf);
+          
+          // Only process if sign is not null
+          if (sign && sign !== null) {
+            setCurrentSign(sign);
+            setConfidence(conf);
 
-          // Sign stabilization: only add to text if same sign detected multiple times
-          if (sign === lastDetectedSignRef.current) {
-            signStabilityCounterRef.current += 1;
+            // Sign stabilization: only add to text if same sign detected multiple times
+            if (sign === lastDetectedSignRef.current) {
+              signStabilityCounterRef.current += 1;
 
-            // Add to text after 3 consecutive detections (1.5 seconds)
-            if (signStabilityCounterRef.current === 3) {
-              setDetectedText(prev => {
-                const words = prev.trim().split(' ').filter(w => w);
-                // Don't add duplicate consecutive signs
-                if (words[words.length - 1] !== sign) {
-                  return (prev + ' ' + sign).trim();
+              // Add to text after 3 consecutive detections (1.5 seconds)
+              if (signStabilityCounterRef.current === 3) {
+                // Handle special case for space (sign '0' or null means space/word boundary)
+                if (sign === '0' || sign === 'SPACE') {
+                  // Complete current word
+                  setWordBuffer(prev => {
+                    if (prev.length > 0) {
+                      const completedWord = prev;
+                      setCompletedWords(words => [...words, completedWord]);
+                      setDetectedText(text => (text + ' ' + completedWord).trim());
+                      speakWord(completedWord); // Speak the completed word
+                      return ''; // Clear buffer
+                    }
+                    return prev;
+                  });
+                } else {
+                  // Add letter to current word buffer
+                  setWordBuffer(prev => {
+                    const newBuffer = prev + sign;
+                    setDetectedText(text => {
+                      // Update display: show completed words + current buffer
+                      const completed = completedWords.join(' ');
+                      return completed ? `${completed} ${newBuffer}` : newBuffer;
+                    });
+                    return newBuffer;
+                  });
+                  
+                  // Optional: speak individual letters if enabled
+                  if (autoSpeak) {
+                    const utterance = new SpeechSynthesisUtterance(sign);
+                    utterance.rate = 1.2; // Faster for individual letters
+                    utterance.volume = 0.6; // Quieter for letters
+                    window.speechSynthesis.speak(utterance);
+                  }
                 }
-                return prev;
-              });
-              signStabilityCounterRef.current = 0;
+                signStabilityCounterRef.current = 0;
+              }
+            } else {
+              // New sign detected, reset counter
+              lastDetectedSignRef.current = sign;
+              signStabilityCounterRef.current = 1;
             }
           } else {
-            // New sign detected, reset counter
-            lastDetectedSignRef.current = sign;
-            signStabilityCounterRef.current = 1;
+            // Confidence too low or no sign detected
+            setCurrentSign(null);
+            setConfidence(0);
+            signStabilityCounterRef.current = 0;
+            lastDetectedSignRef.current = null;
           }
         } else {
           // No confident prediction
           setCurrentSign(null);
           setConfidence(0);
           signStabilityCounterRef.current = 0;
+          lastDetectedSignRef.current = null;
         }
       } catch (error) {
         console.error('Prediction error:', error);
@@ -186,22 +255,39 @@ const SignToText = () => {
       clearInterval(predictionIntervalRef.current);
       predictionIntervalRef.current = null;
     }
+    
+    // Complete any remaining word in buffer
+    if (wordBuffer.length > 0) {
+      const finalText = [...completedWords, wordBuffer].join(' ');
+      setDetectedText(finalText);
+      if (autoSpeak && finalText) {
+        speakWord(wordBuffer);
+      }
+    }
+    
     setIsCameraActive(false);
     setCurrentSign(null);
     setConfidence(0);
-    setDetectedText('Camera stopped. Ready to start new session.');
+    window.speechSynthesis.cancel(); // Stop any ongoing speech
   };
 
-  // Cleanup effect
-  useEffect(() => {
-    return () => {
-      handleStopCamera();
-    };
-  }, []);
+  const handleClearText = () => {
+    setDetectedText('');
+    setWordBuffer('');
+    setCompletedWords([]);
+    window.speechSynthesis.cancel();
+  };
+
+  const handleSpeakFullText = () => {
+    const fullText = detectedText || [...completedWords, wordBuffer].filter(w => w).join(' ');
+    if (fullText && fullText !== 'Sign language interpretation will appear here...') {
+      speakText(fullText);
+    }
+  };
 
   return (
     <div className="p-8">
-      <TitleIconContainer icon={Type} colorClass="text-blue-600" title="Sign Language to Text" />
+      <TitleIconContainer icon={Volume2} colorClass="text-blue-600" title="Sign Language to Speech Conversion" />
 
       {/* Model Loading Status */}
       {isModelLoading && (
@@ -265,8 +351,10 @@ const SignToText = () => {
 
       </div>
 
-      {/* Debug View */}
-      <div className="flex items-center justify-center mb-4">
+      {/* Controls */}
+      <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
+
+        {/* Debug Toggle */}
         <label className="flex items-center cursor-pointer">
           <div className="relative">
             <input
@@ -279,69 +367,133 @@ const SignToText = () => {
             <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition ${debugMode ? 'transform translate-x-6' : ''}`}></div>
           </div>
           <div className="ml-3 text-gray-700 font-medium">
-            Debug Mode (Show what AI sees)
+            Debug View
           </div>
         </label>
+
+        {/* Auto Speak Toggle */}
+        <label className="flex items-center cursor-pointer">
+          <div className="relative">
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={autoSpeak}
+              onChange={() => setAutoSpeak(!autoSpeak)}
+            />
+            <div className={`block w-14 h-8 rounded-full ${autoSpeak ? 'bg-green-600' : 'bg-gray-400'}`}></div>
+            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition ${autoSpeak ? 'transform translate-x-6' : ''}`}></div>
+          </div>
+          <div className="ml-3 text-gray-700 font-medium">
+            Auto Speak
+          </div>
+        </label>
+
+        {/* Camera Buttons */}
+        <div className="flex space-x-4">
+          {!isCameraActive ? (
+            <PrimaryButton
+              onClick={handleStartCamera}
+              icon={Type}
+              className="w-40"
+              disabled={!modelLoaded || isModelLoading}
+            >
+              Start Camera
+            </PrimaryButton>
+          ) : (
+            <PrimaryButton onClick={handleStopCamera} icon={StopCircle} className="w-40 bg-red-600 hover:bg-red-700">
+              Stop Camera
+            </PrimaryButton>
+          )}
+        </div>
       </div>
 
+      {/* Debug View Panel */}
       {debugMode && debugImage && (
         <div className="mb-6 p-4 bg-gray-100 rounded-xl border border-gray-300 flex flex-col items-center">
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">AI Input View (Preprocessed)</h3>
+          <h3 className="text-sm font-semibold text-gray-600 mb-2">AI Input View (128x128)</h3>
           <div className="relative w-32 h-32 bg-black rounded-lg overflow-hidden border-2 border-blue-500">
             <img src={debugImage} alt="Debug View" className="w-full h-full object-cover" />
           </div>
           <p className="text-xs text-gray-500 mt-2 text-center max-w-xs">
-            This is the exact image sent to the model. Ensure the hand is clearly visible and separated from the background.
+            This is the exact image sent to the model. Ensure the hand is clearly visible and centered.
           </p>
         </div>
       )}
-
-      {/* Status Info */}
-      {isCameraActive && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-sm text-green-800">
-            ✓ Camera active • AI detection running • Hold each sign steady for best results
-          </p>
-        </div>
-      )}
-
-      <div className="flex justify-center space-x-4 mb-8">
-        {!isCameraActive ? (
-          <PrimaryButton
-            onClick={handleStartCamera}
-            icon={Type}
-            className="w-48"
-            disabled={!modelLoaded || isModelLoading}
-          >
-            Start Camera
-          </PrimaryButton>
-        ) : (
-          <PrimaryButton onClick={handleStopCamera} icon={StopCircle} className="w-48 bg-red-600 hover:bg-red-700">
-            Stop Camera
-          </PrimaryButton>
-        )}
-      </div>
 
       {/* Detected Text Area */}
-      <h2 className="text-lg font-semibold text-gray-700 mb-3">Live Transcription:</h2>
       <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-inner">
-        <p className="w-full h-32 bg-transparent resize-none overflow-y-auto text-gray-800 p-1">
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-lg font-semibold text-gray-700">Live Transcription:</h2>
+          <div className="flex space-x-2">
+            <button
+              onClick={handleClearText}
+              className="p-2 rounded-full hover:bg-gray-100 transition text-gray-600"
+              title="Clear Text"
+              disabled={!detectedText || detectedText === 'Sign language interpretation will appear here...'}
+            >
+              <StopCircle className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleSpeakFullText}
+              className={`p-2 rounded-full hover:bg-gray-100 transition ${isSpeaking ? 'text-green-600' : 'text-gray-600'}`}
+              title="Speak Full Text"
+              disabled={!detectedText || detectedText === 'Sign language interpretation will appear here...'}
+            >
+              {isSpeaking ? <Volume2 className="w-6 h-6 animate-pulse" /> : <Volume2 className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+        
+        {/* Current word being typed */}
+        {wordBuffer && (
+          <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <span className="text-xs text-blue-600 font-semibold">Current Word: </span>
+            <span className="text-blue-800 font-mono text-lg">{wordBuffer}</span>
+          </div>
+        )}
+        
+        {/* Completed words */}
+        {completedWords.length > 0 && (
+          <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+            <span className="text-xs text-green-600 font-semibold">Completed: </span>
+            <span className="text-green-800 font-mono">{completedWords.join(' ')}</span>
+          </div>
+        )}
+        
+        <div className="w-full min-h-32 bg-gray-50 rounded-lg p-3 overflow-y-auto text-gray-800 text-lg font-mono">
           {detectedText || 'Detected signs will appear here...'}
-        </p>
+        </div>
       </div>
 
       {/* Instructions */}
-      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-        <h3 className="font-semibold text-gray-700 mb-2">Tips for best results:</h3>
-        <ul className="text-sm text-gray-600 space-y-1">
-          <li>• Ensure good lighting on your hands</li>
-          <li>• Keep your hand centered in the frame</li>
-          <li>• Hold each sign steady for 1-2 seconds</li>
-          <li>• Use a plain background if possible</li>
-        </ul>
+      <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+        <h3 className="font-semibold text-gray-700 mb-3 flex items-center">
+          <AlertCircle className="w-5 h-5 mr-2 text-blue-600" />
+          Tips for Best Results:
+        </h3>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div>
+            <h4 className="font-medium text-gray-700 mb-2 text-sm">Camera Setup:</h4>
+            <ul className="text-sm text-gray-600 space-y-1">
+              <li>• Ensure good lighting on your hands</li>
+              <li>• Keep your hand centered in the frame</li>
+              <li>• Hold each sign steady for 1.5 seconds</li>
+              <li>• Avoid rapid hand movements</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-medium text-gray-700 mb-2 text-sm">Speech Features:</h4>
+            <ul className="text-sm text-gray-600 space-y-1">
+              <li>• Enable "Auto Speak" to hear letters as detected</li>
+              <li>• Use sign '0' or pause to complete a word</li>
+              <li>• Completed words will be spoken automatically</li>
+              <li>• Click speaker icon to replay full text</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
-export default SignToText;
+export default SignToSpeech;
