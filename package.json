@@ -7,5 +7,9 @@
         "dev": "cd frontend && npm start",
         "install:all": "cd frontend && npm install && cd ../model-training && pip install -r requirements.txt",
         "server": "cd model-training && python api_server_asl.py"
+    },
+    "dependencies": {
+        "framer-motion": "^12.23.24",
+        "lucide-react": "^0.554.0"
     }
 }
