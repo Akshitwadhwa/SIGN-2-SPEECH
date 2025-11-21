@@ -302,18 +302,6 @@ source ~/.venvs/py311-tf/bin/activate
 python api_server_asl.py
 ```
 
-### Speech Recognition Not Working
-- Use Chrome, Edge, or Safari (Firefox doesn't support Web Speech API)
-- Grant microphone permissions in browser
-- Ensure you're on HTTPS or localhost
-- Check browser console for errors
-
-### Performance Issues
-- ✅ Model optimized for real-time inference
-- ✅ Using Apple M2 GPU (Metal backend) for acceleration
-- Close unnecessary browser tabs
-- Check system resource usage
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
