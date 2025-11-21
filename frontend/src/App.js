@@ -5,6 +5,7 @@ import SignToText from './components/SignToText';
 import TextToSpeech from './components/TextToSpeech';
 import SpeechToSignLanguage from './components/SpeechToSignLanguage';
 import EmotionDetection from './components/EmotionDetection';
+import LoadingScreen from './components/Loadingscreen';
 
 // Define tab configuration for navigation and icon mapping
 const tabs = [
@@ -18,6 +19,7 @@ const tabs = [
 // --- Main Application Component ---
 
 const App = () => {
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(tabs[0].id);
   const { callApi, loading } = useBackendIntegration();
 
@@ -37,6 +39,11 @@ const App = () => {
         return <div className="p-8 text-gray-500">Select a feature from the navigation bar.</div>;
     }
   };
+
+  // Show loading screen on initial load
+  if (isLoading) {
+    return <LoadingScreen onLoadingComplete={() => setIsLoading(false)} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans antialiased">
