@@ -1,12 +1,121 @@
-import React, { useRef, useEffect, useState } from 'react';
-import * as faceapi from 'face-api.js';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Smile, Frown, Meh, AlertCircle, Zap, Activity, 
-  ScanFace, Sparkles, Pause, Play, Power 
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { Type, Volume2, Mic, Smile, LayoutGrid } from 'lucide-react';
 
-const EmotionCam = () => {
+// Make sure these file names match exactly what is in your folder (Case Sensitive!)
+import useBackendIntegration from './hooks/useBackendIntegration';
+import SignToText from './components/SignToText';
+import TextToSpeech from './components/TextToSpeech';
+import SpeechToSignLanguage from './components/SpeechToSignLanguage';
+import EmotionCam from './components/Emotioncam'; // Fixed capitalization
+import LoadingScreen from './components/Loadingscreen'; // Fixed capitalization
+
+const tabs = [
+  { id: 'sign_to_text', name: 'Sign to Text', icon: Type },
+  { id: 'text_to_speech', name: 'Text to Speech', icon: Volume2 },
+  { id: 'speech_to_sign', name: 'Speech to Sign', icon: Mic },
+  { id: 'emotion_detection', name: 'Emotion Detection', icon: Smile },
+];
+
+const App = () => {
+  const [isLoading, setIsLoading] = useState(true); // App-wide loading screen
+  const [activeTab, setActiveTab] = useState(tabs[0].id);
+  
+  // Assuming this hook handles your Python backend communication
+  const { callApi, loading: apiLoading } = useBackendIntegration();
+
+  // Show the "Splash Screen" first
+  if (isLoading) {
+    return <LoadingScreen onLoadingComplete={() => setIsLoading(false)} />;
+  }
+
+  // Render the specific feature
+  const renderContent = () => {
+    // We pass API props down, in case the components need to talk to Flask
+    const apiProps = { callApi, apiLoading };
+
+    switch (activeTab) {
+      case 'sign_to_text':
+        return <SignToText {...apiProps} />;
+      case 'text_to_speech':
+        return <TextToSpeech {...apiProps} />;
+      case 'speech_to_sign':
+        return <SpeechToSignLanguage {...apiProps} />;
+      case 'emotion_detection':
+        return <EmotionCam {...apiProps} />;
+      default:
+        return <div className="p-8 text-center text-gray-500">Component not found</div>;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+      
+      {/* --- Navigation Bar --- */}
+      <nav className="bg-white shadow-sm sticky top-0 z-40 border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            
+            {/* Logo */}
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+                 <LayoutGrid className="text-white w-5 h-5" />
+              </div>
+              <span className="text-xl font-bold text-gray-900 tracking-tight">
+                Sign2<span className="text-indigo-600">Speech</span>
+              </span>
+            </div>
+
+            {/* Desktop Navigation */}
+            <div className="flex space-x-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-hide">
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab.id;
+                const Icon = tab.icon;
+                
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`
+                      flex items-center px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap
+                      ${isActive
+                        ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 shadow-sm'
+                        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
+                      }
+                    `}
+                  >
+                    <Icon className={`w-4 h-4 mr-2 ${isActive ? 'text-indigo-600' : 'text-gray-400'}`} />
+                    {tab.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* --- Main Content --- */}
+      {/* Removed the 'bg-white shadow' wrapper so components fit naturally */}
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="animate-fade-in-up">
+           {renderContent()}
+        </div>
+      </main>
+
+      {/* --- Backend API Loading Overlay --- */}
+      {apiLoading && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white px-8 py-6 rounded-2xl shadow-2xl flex flex-col items-center animate-bounce-in">
+            <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+            <span className="text-gray-800 font-semibold">Processing...</span>
+            <span className="text-gray-500 text-xs mt-1">Talking to AI Model</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const OldEmotionCamComponent = () => {
   const videoRef = useRef();
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   
