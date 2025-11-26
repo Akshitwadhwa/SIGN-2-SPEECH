@@ -12,7 +12,7 @@ A comprehensive React application for real-time sign language recognition, text-
 - ✅ Customizable confidence thresholds
 - ✅ 100% model accuracy achieved
 
-### 2. ⚠️ **Text to Speech** - PARTIALLY IMPLEMENTED
+### 2. ⚠️ **Text to Speech** - IMPLEMENTED
 - ⚠️ Convert written text to spoken audio
 - ⚠️ Adjustable speech speed
 - ⚠️ Audio playback controls (play, pause, stop)
