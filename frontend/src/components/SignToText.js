@@ -25,6 +25,8 @@ const SignToSpeech = () => {
   const canvasRef = useRef(null);
   const lastDetectedSignRef = useRef(null);
   const signStabilityCounterRef = useRef(0);
+  const cooldownCounterRef = useRef(0);
+  const lastAddedSignRef = useRef(null);
 
   // Load model on component mount
   useEffect(() => {
@@ -119,6 +121,8 @@ const SignToSpeech = () => {
     setCompletedWords([]);
     lastDetectedSignRef.current = null;
     signStabilityCounterRef.current = 0;
+    cooldownCounterRef.current = 0;
+    lastAddedSignRef.current = null;
 
     // Run predictions every 500ms
     predictionIntervalRef.current = setInterval(async () => {
@@ -130,16 +134,24 @@ const SignToSpeech = () => {
         // Update the grayscale preview box
         updateGrayscalePreview();
 
-        // Make prediction on current frame
-        const prediction = await signLanguageModel.predict(videoRef.current, 0.6, debugMode);
+        // Make prediction on current frame with higher threshold
+        const prediction = await signLanguageModel.predict(videoRef.current, 0.75, debugMode);
 
         if (prediction) {
           const { sign, confidence: conf, debugImage: dbgImg } = prediction;
 
           setDebugImage(dbgImg);
 
-          // Only process if sign is not null
-          if (sign && sign !== null) {
+          // Check if we're in cooldown period
+          if (cooldownCounterRef.current > 0) {
+            cooldownCounterRef.current -= 1;
+            setCurrentSign(null);
+            setConfidence(0);
+            return;
+          }
+
+          // Only process if sign is not null and has good confidence
+          if (sign && sign !== null && conf >= 0.75) {
             setCurrentSign(sign);
             setConfidence(conf);
 
@@ -147,42 +159,51 @@ const SignToSpeech = () => {
             if (sign === lastDetectedSignRef.current) {
               signStabilityCounterRef.current += 1;
 
-              // Add to text after 3 consecutive detections (1.5 seconds)
-              if (signStabilityCounterRef.current === 3) {
-                // Handle special case for space (sign '0' or null means space/word boundary)
-                if (sign === '0' || sign === 'SPACE') {
-                  // Complete current word
-                  setWordBuffer(prev => {
-                    if (prev.length > 0) {
-                      const completedWord = prev;
-                      setCompletedWords(words => [...words, completedWord]);
-                      setDetectedText(text => (text + ' ' + completedWord).trim());
-                      speakWord(completedWord); // Speak the completed word
-                      return ''; // Clear buffer
-                    }
-                    return prev;
-                  });
-                } else {
-                  // Add letter to current word buffer
-                  setWordBuffer(prev => {
-                    const newBuffer = prev + sign;
-                    setDetectedText(text => {
-                      // Update display: show completed words + current buffer
-                      const completed = completedWords.join(' ');
-                      return completed ? `${completed} ${newBuffer}` : newBuffer;
+              // Require 5 consecutive detections (2.5 seconds) for better stability
+              if (signStabilityCounterRef.current >= 5) {
+                // Prevent adding the same letter twice in a row
+                if (sign !== lastAddedSignRef.current) {
+                  // Handle special case for space (sign '0' or null means space/word boundary)
+                  if (sign === '0' || sign === 'SPACE') {
+                    // Complete current word
+                    setWordBuffer(prev => {
+                      if (prev.length > 0) {
+                        const completedWord = prev;
+                        setCompletedWords(words => [...words, completedWord]);
+                        setDetectedText(text => (text + ' ' + completedWord).trim());
+                        speakWord(completedWord); // Speak the completed word
+                        lastAddedSignRef.current = sign;
+                        return ''; // Clear buffer
+                      }
+                      return prev;
                     });
-                    return newBuffer;
-                  });
+                  } else {
+                    // Add letter to current word buffer
+                    setWordBuffer(prev => {
+                      const newBuffer = prev + sign;
+                      setDetectedText(text => {
+                        // Update display: show completed words + current buffer
+                        const completed = completedWords.join(' ');
+                        return completed ? `${completed} ${newBuffer}` : newBuffer;
+                      });
+                      lastAddedSignRef.current = sign;
+                      return newBuffer;
+                    });
 
-                  // Optional: speak individual letters if enabled
-                  if (autoSpeak) {
-                    const utterance = new SpeechSynthesisUtterance(sign);
-                    utterance.rate = 1.2; // Faster for individual letters
-                    utterance.volume = 0.6; // Quieter for letters
-                    window.speechSynthesis.speak(utterance);
+                    // Optional: speak individual letters if enabled
+                    if (autoSpeak) {
+                      const utterance = new SpeechSynthesisUtterance(sign);
+                      utterance.rate = 1.2; // Faster for individual letters
+                      utterance.volume = 0.6; // Quieter for letters
+                      window.speechSynthesis.speak(utterance);
+                    }
                   }
+                  
+                  // Set cooldown: wait 6 intervals (3 seconds) before detecting next sign
+                  cooldownCounterRef.current = 6;
+                  signStabilityCounterRef.current = 0;
+                  lastDetectedSignRef.current = null;
                 }
-                signStabilityCounterRef.current = 0;
               }
             } else {
               // New sign detected, reset counter
@@ -193,15 +214,19 @@ const SignToSpeech = () => {
             // Confidence too low or no sign detected
             setCurrentSign(null);
             setConfidence(0);
-            signStabilityCounterRef.current = 0;
-            lastDetectedSignRef.current = null;
+            // Don't reset counters immediately - allow for brief fluctuations
+            if (signStabilityCounterRef.current > 0) {
+              signStabilityCounterRef.current = Math.max(0, signStabilityCounterRef.current - 1);
+            }
           }
         } else {
           // No confident prediction
           setCurrentSign(null);
           setConfidence(0);
-          signStabilityCounterRef.current = 0;
-          lastDetectedSignRef.current = null;
+          // Don't reset counters immediately
+          if (signStabilityCounterRef.current > 0) {
+            signStabilityCounterRef.current = Math.max(0, signStabilityCounterRef.current - 1);
+          }
         }
       } catch (error) {
         console.error('Prediction error:', error);
@@ -487,7 +512,8 @@ const SignToSpeech = () => {
             <ul className="space-y-2 text-sm text-gray-600">
               <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary"></div>Ensure good lighting on your hands</li>
               <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary"></div>Keep your hand centered in the frame</li>
-              <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary"></div>Hold each sign steady for 1.5 seconds</li>
+              <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary"></div>Hold each sign steady for 2-3 seconds</li>
+              <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary"></div>Move your hand away between signs</li>
             </ul>
           </div>
           <div className="space-y-2">
