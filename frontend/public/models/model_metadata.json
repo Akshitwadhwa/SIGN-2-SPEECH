@@ -1,0 +1,43 @@
+{
+  "class_names": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    "I",
+    "J",
+    "K",
+    "L",
+    "M",
+    "N",
+    "O",
+    "P",
+    "Q",
+    "R",
+    "S",
+    "T",
+    "U",
+    "V",
+    "W",
+    "X",
+    "Y",
+    "Z"
+  ],
+  "img_size": 64,
+  "num_classes": 26,
+  "input_shape": [
+    64,
+    64,
+    1
+  ],
+  "test_accuracy": 1.0,
+  "test_loss": 3.5648085940920282e-06,
+  "val_accuracy": 1.0,
+  "val_loss": 1.44712976180017e-06,
+  "epochs_trained": 30,
+  "preprocessing": "ASL-style (grayscale \u2192 blur \u2192 adaptive threshold \u2192 Otsu \u2192 resize)"
+}
