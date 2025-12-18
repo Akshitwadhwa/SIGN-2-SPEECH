@@ -1,0 +1,50 @@
+# Python virtual environments
+model-training/tf_env/
+tf_env/
+venv/
+env/
+ENV/
+.venv/
+
+# Large data files
+model-training/data_img.npy
+*.npy
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Model files (large binary files)
+*.h5
+*.keras
+*.pb
+*.dylib
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment variables
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node modules (already in frontend/.gitignore but good to have here too)
+node_modules/
+
+# Build outputs
+build/
+dist/
+*.egg-info/
