@@ -19,6 +19,7 @@ __pycache__/
 
 # Model files (large binary files)
 *.h5
+!model-training/best_model.h5
 *.keras
 *.pb
 *.dylib

@@ -1,0 +1,11 @@
+*.npy
+tf_env/
+dataset/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.ipynb
+ASL_train.ipynb
+saved_model/
+tfjs_model/
+model-*.keras

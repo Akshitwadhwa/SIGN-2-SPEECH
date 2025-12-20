@@ -35,7 +35,21 @@ def load_model():
         print("Loading ASL sign language model...")
         
         # Use your trained best_model.h5 (100% accuracy)
-        model_path = '../frontend/public/models/best_model.h5'
+        # Check multiple possible locations for the model
+        possible_paths = [
+            'best_model.h5',  # Same directory (for Render deployment)
+            '../frontend/public/models/best_model.h5',  # Local development
+            '/opt/render/project/src/model-training/best_model.h5'  # Render absolute path
+        ]
+        
+        model_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                model_path = path
+                break
+        
+        if model_path is None:
+            raise FileNotFoundError("Model file not found in any expected location")
         
         # Load model
         model = keras.models.load_model(model_path)
